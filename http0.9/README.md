@@ -11,6 +11,7 @@ Was the first version of http, there were no status codes, headers, only html pa
 - HTTP/0.9 - https://http.dev/0.9
 - Evolution of HTTP - https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/Evolution_of_HTTP
 - The first http web page - http://info.cern.ch/hypertext/WWW/TheProject.html
+- Summary of HTTP/0.9 - https://www.w3.org/DesignIssues/HTTP0.9Summary.html
 
 ## How to test
 
