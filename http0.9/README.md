@@ -78,6 +78,8 @@ Connection closed by foreign host.
 
 ## Path traversal attack solution
 
+- [Commit](https://github.com/thiago-figueredo/http-history/commit/a8931d264c1954a4845037e06fbb62d4cfe043db)
+
 ```rust
 fn handle_data(stream: &mut TcpStream) {
   let mut reader = std::io::BufReader::new(stream.try_clone().unwrap());
@@ -91,7 +93,7 @@ fn handle_data(stream: &mut TcpStream) {
       let mut abs_path = format!("{}/public{}", cwd.display(), path);
 
       while abs_path.contains("../") {
-          abs_path = abs_path.replace("../", "")
+        abs_path = abs_path.replace("../", "")
       }
 
       Http::try_send_file(stream, &abs_path)
@@ -104,6 +106,8 @@ fn handle_data(stream: &mut TcpStream) {
 }
 
 ```
+
+---
 
 ```rust
 while abs_path.contains("../") {
