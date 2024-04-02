@@ -1,15 +1,17 @@
 use std::net::{TcpStream, TcpListener};
-use std::fs::read_to_string;
 use std::io::BufRead;
 use std::path::Path;
 use std::io::Write;
 use std::env;
+use std::fs;
 
 struct Http {
     addr: String,
 }
 
 impl Http {
+    const NOT_FOUND_HTML: &str = "<html><body>Not found<body></html>\r\n";
+
     fn new(host: String, port: u16) -> Self {
         Self { addr: format!("{}:{}", host, port) }
     }
@@ -25,14 +27,14 @@ impl Http {
 
         loop {
             match listener.accept() {
-                // TODO: Handle the stream in a separate thread to allow multiple concurrent connections
-                Ok((stream, addr)) => {
+                Ok((stream, _)) => {
                     let mut mutable_stream = stream.try_clone().unwrap();
                     Http::handle_data(&mut mutable_stream) 
                 }
                 Err(e) => {
                     println!("Failed to establish a connection: {}", e);
-                } }
+                } 
+            }
         }
     }
 
@@ -44,18 +46,14 @@ impl Http {
 
         match buffer.split_whitespace().collect::<Vec<&str>>().as_slice() {
             [method, path] if *method == "GET" => {
-                // WARNING: Vulnerable to path traversal attacks
                 let cwd = env::current_dir().unwrap();
-                let abs_path = format!("{}/public/{}", cwd.display(), path);
-                let filepath = Path::new(&abs_path);
+                let mut abs_path = format!("{}/public{}", cwd.display(), path);
 
-                if !filepath.exists() {
-                    Http::error(stream);
-                    return
+                while abs_path.contains("../") {
+                    abs_path = abs_path.replace("../", "")
                 }
 
-                let response = read_to_string(filepath).unwrap();
-                stream.write(response.as_bytes()).unwrap();
+                Http::try_send_file(stream, &abs_path)
             }
 
             _ => {
@@ -64,14 +62,19 @@ impl Http {
         }
     }
 
+    fn try_send_file(stream: &mut TcpStream, filepath: &String) {
+        match fs::read_to_string(Path::new(filepath)) {
+            Ok(response) => stream.write(response.as_bytes()).unwrap(),
+            Err(_) => stream.write(Http::NOT_FOUND_HTML.as_bytes()).unwrap()
+        };
+    }
+
     fn error(stream: &mut TcpStream) {
         let cwd = env::current_dir().unwrap();
         let filepath = format!("{}/public/error.html", cwd.display());
-        let response = read_to_string(Path::new(&filepath)).unwrap();
 
-        stream.write(response.as_bytes()).unwrap();
+        Http::try_send_file(stream, &filepath)
     }
-
 }
 
 fn main() {

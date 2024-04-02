@@ -53,7 +53,7 @@ $ telnet localhost 3333
 Trying ::1...
 Connected to localhost.
 Escape character is '^]'.
-GET ../../../../../../../../../../etc/passwd
+GET /../../../../../../../../../../etc/passwd
 root:x:0:0:root:/root:/bin/bash
 daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
 bin:x:2:2:bin:/bin:/usr/sbin/nologin
@@ -74,4 +74,57 @@ gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologi
 nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
 _apt:x:100:65534::/nonexistent:/usr/sbin/nologin
 Connection closed by foreign host.
+```
+
+## Path traversal attack solution
+
+```rust
+fn handle_data(stream: &mut TcpStream) {
+  let mut reader = std::io::BufReader::new(stream.try_clone().unwrap());
+  let mut buffer = String::new();
+
+  reader.read_line(&mut buffer).unwrap();
+
+  match buffer.split_whitespace().collect::<Vec<&str>>().as_slice() {
+    [method, path] if *method == "GET" => {
+      let cwd = env::current_dir().unwrap();
+      let mut abs_path = format!("{}/public{}", cwd.display(), path);
+
+      while abs_path.contains("../") {
+          abs_path = abs_path.replace("../", "")
+      }
+
+      Http::try_send_file(stream, &abs_path)
+    }
+
+    _ => {
+        Http::error(stream)
+    }
+  }
+}
+
+```
+
+```rust
+while abs_path.contains("../") {
+  abs_path = abs_path.replace("../", "")
+}
+```
+
+This code is necessary because if we remove ../ only one time the attacker can make this http request to bypass the filter:
+
+```
+GET /..././..././..././..././..././..././..././..././..././..././etc/passwd
+```
+
+That would be turned into:
+
+```
+GET /../../../../../../../../../../etc/passwd
+```
+
+with the recursive filter all ../ are remove and the final result is:
+
+```
+GET /etc/passwd
 ```
